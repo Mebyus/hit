@@ -109,15 +109,20 @@ Usage:
 	var timeout time.Duration
 	var err error
 
+	t = strings.TrimSpace(t)
 	switch t {
 	case "", "0":
 		// continue execution
 	default:
 		timeout, err = time.ParseDuration(t)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "parse timeout string: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[fatal] parse timeout string: %v\n", err)
 			os.Exit(1)
 		}
+	}
+	if timeout < 0 {
+		fmt.Fprintf(os.Stderr, "[fatal] invalid (negative) timeout\n")
+		os.Exit(1)
 	}
 
 	m = strings.ToUpper(m)
@@ -140,7 +145,7 @@ Usage:
 	if len(queryParams) != 0 {
 		parsed, err := url.Parse(u)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "bad url \"%s\": %v", u, err)
+			fmt.Fprintf(os.Stderr, "[fatal] bad url \"%s\": %v\n", u, err)
 			os.Exit(1)
 		}
 
@@ -183,7 +188,7 @@ Usage:
 	}
 
 	if body != nil && m == "GET" {
-		fmt.Printf("[warn] GET request configured with body")
+		fmt.Printf("[warn] GET request configured with body\n")
 	}
 	req, err := http.NewRequestWithContext(context.Background(), m, u, body)
 	if err != nil {
