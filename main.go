@@ -17,12 +17,15 @@ import (
 	"time"
 )
 
+var Version string
+
 type keyValue struct {
 	key   string
 	value string
 }
 
 func main() {
+	var ver bool
 	var u string
 	var f string
 	var m string
@@ -35,6 +38,7 @@ func main() {
 	var bodystr string
 	var basicUser string
 	var basicPass string
+	flag.BoolVar(&ver, "v", false, "print version and exit")
 	flag.StringVar(&u, "u", "", "request url (required)")
 	flag.StringVar(&f, "f", "", "path to file with request body")
 	flag.StringVar(&bodystr, "s", "", "specify request body as a string")
@@ -76,9 +80,31 @@ func main() {
 		return nil
 	})
 
+	var headers []keyValue
+	flag.Func("x", "request header key=value pair, can be used multiple times", func(s string) error {
+		key, value, ok := strings.Cut(s, "=")
+		if !ok {
+			return errors.New("header must take form of key=value pair")
+		}
+
+		headers = append(headers, keyValue{
+			key:   key,
+			value: value,
+		})
+		return nil
+	})
+
 	// TODO: flag for providing custom tls certificates
 
 	flag.Parse()
+
+	if ver {
+		if Version == "" {
+			Version = "dev"
+		}
+		fmt.Println(Version)
+		return
+	}
 
 	u = strings.TrimSpace(u)
 	if u == "" {
@@ -87,6 +113,7 @@ func main() {
 Usage:
 	
 	hit [options] -u <url>  | send request
+	hit -v                  | print version
 	hit -h                  | help
 
 `)
@@ -194,6 +221,10 @@ Usage:
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+
+	for _, h := range headers {
+		req.Header.Add(h.key, h.value)
 	}
 
 	for _, c := range cookies {
