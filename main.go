@@ -76,6 +76,8 @@ func main() {
 		return nil
 	})
 
+	// TODO: flag for providing custom tls certificates
+
 	flag.Parse()
 
 	u = strings.TrimSpace(u)
@@ -121,7 +123,7 @@ Usage:
 	m = strings.ToUpper(m)
 	switch m {
 	case "":
-		if f == "" {
+		if f == "" && bodystr == "" {
 			m = "GET"
 		} else {
 			m = "QUERY"
@@ -174,6 +176,14 @@ Usage:
 		fmt.Printf("[info] read %d bytes from \"%s\" for request body\n\n", len(data), f)
 	} else if bodystr != "" {
 		body = strings.NewReader(bodystr)
+		fmt.Printf("[info] take %d bytes from string for request body\n\n", len(bodystr))
+	}
+	if ctype == "auto" {
+		ctype = ""
+	}
+
+	if body != nil && m == "GET" {
+		fmt.Printf("[warn] GET request configured with body")
 	}
 	req, err := http.NewRequestWithContext(context.Background(), m, u, body)
 	if err != nil {
