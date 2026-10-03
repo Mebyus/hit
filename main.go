@@ -257,8 +257,10 @@ Usage:
 
 	start := time.Now()
 	r, err := client.Do(req)
+	helapsed := time.Since(start)
+
 	fmt.Printf("===== STATS =====\n\n")
-	fmt.Printf("elapsed: %s\n", time.Since(start))
+	fmt.Printf("elapsed: %s\n", helapsed.Round(10*time.Microsecond))
 	fmt.Printf("clength: %s\n\n", formatContentLength(r.ContentLength))
 	if err != nil {
 		fmt.Printf("=============\n\n")
@@ -276,17 +278,34 @@ Usage:
 		var nread int64 // number of bytes read from body
 
 		fmt.Printf("===== RESPONSE BODY =====\n\n")
+		var belapsed time.Duration
 		if strings.Contains(r.Header.Get("Content-Type"), "json") {
-			nread = printJSONBody(r.Body)
+			nread, belapsed = printJSONBody(r.Body)
 		} else {
+			start := time.Now()
 			nread, err = io.Copy(os.Stdout, r.Body)
+			belapsed = time.Since(start)
+
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "[error] read response body: %s\n", err)
 			}
 			io.WriteString(os.Stdout, "\n\n=============\n\n")
 		}
 
+		total := helapsed + belapsed
+		fmt.Printf("elapsed: %v (%v + %v)\n", total.Round(100*time.Microsecond), helapsed.Round(10*time.Microsecond), belapsed.Round(10*time.Microsecond))
 		fmt.Printf("body.read: %d bytes\n", nread)
+	} else {
+		fmt.Printf("elapsed: %v\n", helapsed.Round(10*time.Microsecond))
+	}
+
+	rcookies := r.Cookies()
+	if len(rcookies) != 0 {
+		fmt.Println()
+
+		for _, c := range rcookies {
+			fmt.Printf("cookie.set: %s=%s\n", c.Name, c.Value)
+		}
 	}
 }
 
@@ -298,20 +317,24 @@ func printResponseHeaders(r *http.Response) {
 	r.Header.Write(os.Stdout)
 }
 
-// returns number of bytes successfully read from body
-func printJSONBody(body io.Reader) int64 {
+// returns number of bytes successfully read from body and time
+// it took to read
+func printJSONBody(body io.Reader) (int64, time.Duration) {
 	var data bytes.Buffer
+	start := time.Now()
 	n, err := io.Copy(&data, body)
+	elapsed := time.Since(start)
+
 	if err != nil {
 		fmt.Printf("[error] read response body: %s\n", err)
-		return n
+		return n, elapsed
 	}
 	buf := bytes.Buffer{}
 	_ = json.Indent(&buf, data.Bytes(), "", "    ")
 	_, _ = os.Stdout.Write(buf.Bytes())
 
 	io.WriteString(os.Stdout, "\n\n=============\n\n")
-	return n
+	return n, elapsed
 }
 
 func formatContentLength(n int64) string {
