@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-var Version string
+var Version string = "v0.2.0"
 
 type keyValue struct {
 	key   string
@@ -296,6 +296,7 @@ Usage:
 		fmt.Printf("elapsed: %v (%v + %v)\n", total.Round(100*time.Microsecond), helapsed.Round(10*time.Microsecond), belapsed.Round(10*time.Microsecond))
 		fmt.Printf("body.read: %d bytes\n", nread)
 	} else {
+		io.WriteString(os.Stdout, "\n\n=============\n\n")
 		fmt.Printf("elapsed: %v\n", helapsed.Round(10*time.Microsecond))
 	}
 
