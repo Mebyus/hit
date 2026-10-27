@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-var Version string = "v0.2.0"
+var Version string = "v0.2.1"
 
 type keyValue struct {
 	key   string
@@ -261,13 +261,14 @@ Usage:
 
 	fmt.Printf("===== STATS =====\n\n")
 	fmt.Printf("elapsed: %s\n", helapsed.Round(10*time.Microsecond))
-	fmt.Printf("clength: %s\n\n", formatContentLength(r.ContentLength))
 	if err != nil {
 		fmt.Printf("=============\n\n")
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	defer r.Body.Close()
+
+	fmt.Printf("clength: %s\n\n", formatContentLength(r.ContentLength))
 
 	fmt.Printf("===== RESPONSE HEADERS =====\n\n")
 	fmt.Printf("Status: %s\n\n", r.Status)
