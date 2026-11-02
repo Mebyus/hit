@@ -2,6 +2,12 @@
 
 /.vscode
 
+*.exe
+
+*.env
+*.json
+*.html
+
 *.log
 *.tmp
 *.temp

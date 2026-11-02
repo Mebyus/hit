@@ -17,7 +17,47 @@ import (
 	"time"
 )
 
-var Version string = "v0.2.1"
+var Version string = "v0.3.0"
+
+// http request prepared to be sent
+type req struct {
+	// required
+	url string
+
+	// required
+	method string
+
+	// authorization via Bearer in Authorization header
+	bearer string
+
+	// Authorization header
+	auth string
+
+	// Content-Type header
+	ctype string
+
+	// can be nil for empty body
+	body io.Reader
+
+	basic basic
+
+	cookies []keyValue
+
+	// fields that affect Authorization header take priority over this list
+	headers []keyValue
+
+	// query parameters
+	params []keyValue
+
+	// zero means no timeout
+	timeout time.Duration
+}
+
+// data for basic auth
+type basic struct {
+	user string
+	pass string
+}
 
 type keyValue struct {
 	key   string
@@ -30,6 +70,7 @@ func main() {
 	var f string
 	var m string
 	var t string
+	var env string
 	var nrep uint64
 	var auth string
 	var bearer string
@@ -41,6 +82,7 @@ func main() {
 	flag.BoolVar(&ver, "v", false, "print version and exit")
 	flag.StringVar(&u, "u", "", "request url (required)")
 	flag.StringVar(&f, "f", "", "path to file with request body")
+	flag.StringVar(&env, "e", "", "path to env file")
 	flag.StringVar(&bodystr, "s", "", "specify request body as a string")
 	flag.StringVar(&m, "m", "", "request method (GET by default, or QUERY when body specified)")
 	flag.StringVar(&t, "t", "5s", "request timeout (set to empty for no timeout)")
@@ -106,13 +148,26 @@ func main() {
 		return
 	}
 
+	_, err := LoadEnv(env)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	args := flag.Args()
+	if len(args) != 0 {
+		// TODO: read http request from text template via http.ReadRequest()
+		panic("stub")
+	}
+
 	u = strings.TrimSpace(u)
 	if u == "" {
 		fmt.Fprintf(os.Stderr, "[fatal] empty request url (-u flag)\n")
 		fmt.Fprint(os.Stderr, `
 Usage:
-	
-	hit [options] -u <url>  | send request
+
+	hit [options] -u <url>  | send request to given url
+	hit [options] <file>    | send request from template file
 	hit -v                  | print version
 	hit -h                  | help
 
@@ -134,7 +189,6 @@ Usage:
 	}
 
 	var timeout time.Duration
-	var err error
 
 	t = strings.TrimSpace(t)
 	switch t {
@@ -276,22 +330,37 @@ Usage:
 	fmt.Println()
 
 	if r.ContentLength != 0 {
+		var out io.Writer
+		out = os.Stdout
+		if outpath != "" {
+			file, err := os.Create(outpath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[error] create output file: %s\n", err)
+			} else {
+				defer file.Close()
+				out = file
+			}
+		}
+
 		var nread int64 // number of bytes read from body
 
 		fmt.Printf("===== RESPONSE BODY =====\n\n")
 		var belapsed time.Duration
 		if strings.Contains(r.Header.Get("Content-Type"), "json") {
-			nread, belapsed = printJSONBody(r.Body)
+			nread, belapsed = printJSONBody(out, r.Body)
 		} else {
 			start := time.Now()
-			nread, err = io.Copy(os.Stdout, r.Body)
+			nread, err = io.Copy(out, r.Body)
 			belapsed = time.Since(start)
 
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "[error] read response body: %s\n", err)
 			}
-			io.WriteString(os.Stdout, "\n\n=============\n\n")
 		}
+		if outpath != "" && out != os.Stdout {
+			fmt.Printf("[info] saved: %s", outpath)
+		}
+		io.WriteString(os.Stdout, "\n\n=============\n\n")
 
 		total := helapsed + belapsed
 		fmt.Printf("elapsed: %v (%v + %v)\n", total.Round(100*time.Microsecond), helapsed.Round(10*time.Microsecond), belapsed.Round(10*time.Microsecond))
@@ -321,7 +390,7 @@ func printResponseHeaders(r *http.Response) {
 
 // returns number of bytes successfully read from body and time
 // it took to read
-func printJSONBody(body io.Reader) (int64, time.Duration) {
+func printJSONBody(out io.Writer, body io.Reader) (int64, time.Duration) {
 	var data bytes.Buffer
 	start := time.Now()
 	n, err := io.Copy(&data, body)
@@ -331,11 +400,11 @@ func printJSONBody(body io.Reader) (int64, time.Duration) {
 		fmt.Printf("[error] read response body: %s\n", err)
 		return n, elapsed
 	}
+
 	buf := bytes.Buffer{}
 	_ = json.Indent(&buf, data.Bytes(), "", "    ")
-	_, _ = os.Stdout.Write(buf.Bytes())
+	_, _ = out.Write(buf.Bytes())
 
-	io.WriteString(os.Stdout, "\n\n=============\n\n")
 	return n, elapsed
 }
 
